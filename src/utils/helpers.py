@@ -3,7 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import zscore
 import seaborn as sns
+from sklearn.cluster import KMeans
 import os
+
+from sklearn.metrics import silhouette_score
+from sklearn.model_selection import GridSearchCV
 
 
 def load_data(file_path):
@@ -91,11 +95,10 @@ def get_education_rank(degree):
 
 
 def heatmap_corr(cor, figures_path, title):
-
     p_corr = round(cor.iloc[1:, :-1].copy(), 2)
 
     # Setting up a diverging palette
-#    plt.subplots(figsize=(12, 6))
+    #    plt.subplots(figsize=(12, 6))
 
     # Prepare figure
     fig = plt.figure(figsize=(10, 8))
@@ -115,6 +118,64 @@ def heatmap_corr(cor, figures_path, title):
     plt.title(title)
     plt.savefig(os.path.join(figures_path, title.replace(" ", "_") + '_heatmap.png'),
                 dpi=200)
+    plt.show()
+
+
+def elbow_method(data):
+    # find 'k' value by Elbow Method
+    inertia = []
+    range_val = range(1, 10)
+    for i in range_val:
+        kmean = KMeans(n_clusters=i)
+        kmean.fit_predict(pd.DataFrame(data))
+        inertia.append(kmean.inertia_)
+
+
+    plt.plot(range_val, inertia, 'bx-')
+    plt.xlabel('Values of K')
+    plt.ylabel('Inertia')
+    plt.title('The Elbow Method using Inertia')
+    plt.show()
+
+
+def hyperparameter_tuning(model_, grid_params, data, cv=5):
+    """adjusting the hyperparameters of a model to improve its performance."""
+    grid = GridSearchCV(estimator=model_, param_grid=grid_params, cv=cv, n_jobs=-1, verbose=20)
+
+    grid.fit(data)
+    model_grid_best = grid.best_estimator_
+    best_params_ = grid.best_params_
+
+    return grid, best_params_
+
+
+def silhouette_method(data):
+    # Storing average silhouette metric
+    avg_silhouette = []
+
+    range_val = range(2, 10)
+    for n_clus in range_val:
+        # Initialize the KMeans object with n_clusters value and a random generator
+        kmeans_cluster = KMeans(n_clusters=n_clus, init='k-means++', n_init=15, random_state=1)
+        cluster_labels = kmeans_cluster.fit_predict(data)
+
+        # The silhouette_score gives the average value for all the samples.
+        # This gives a perspective into the density and separation of the formed clusters
+        silhouette_avg = silhouette_score(data, cluster_labels)
+        avg_silhouette.append(silhouette_avg)
+        print(f"For n_clusters = {n_clus}, the average silhouette_score is : {silhouette_avg}")
+
+    # Find the index of the highest silhouette score
+    optimal_k = np.argmax(avg_silhouette) + 2
+    # Print the optimal value of k
+    print("Optimal number of clusters:", optimal_k)
+
+    # The average silhouette plot
+    # The inertia plot
+    plt.plot(avg_silhouette)
+    plt.ylabel("Average silhouette")
+    plt.xlabel("Number of clusters")
+    plt.title("Average silhouette plot over clusters", size=15)
     plt.show()
 
 
