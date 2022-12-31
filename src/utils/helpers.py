@@ -5,9 +5,12 @@ from scipy.stats import zscore
 import seaborn as sns
 from sklearn.cluster import KMeans
 import os
-
+import warnings
 from sklearn.metrics import silhouette_score
 from sklearn.model_selection import GridSearchCV
+from scipy.cluster.hierarchy import dendrogram, linkage
+
+warnings.filterwarnings("ignore")
 
 
 def load_data(file_path):
@@ -130,7 +133,6 @@ def elbow_method(data):
         kmean.fit_predict(pd.DataFrame(data))
         inertia.append(kmean.inertia_)
 
-
     plt.plot(range_val, inertia, 'bx-')
     plt.xlabel('Values of K')
     plt.ylabel('Inertia')
@@ -138,9 +140,9 @@ def elbow_method(data):
     plt.show()
 
 
-def hyperparameter_tuning(model_, grid_params, data, cv=5):
+def hyperparameter_tuning(model_, grid_params, data, scoring='f1', cv=5):
     """adjusting the hyperparameters of a model to improve its performance."""
-    grid = GridSearchCV(estimator=model_, param_grid=grid_params, cv=cv, n_jobs=-1, verbose=20)
+    grid = GridSearchCV(estimator=model_, param_grid=grid_params, scoring=scoring, cv=cv)
 
     grid.fit(data)
     model_grid_best = grid.best_estimator_
@@ -176,6 +178,23 @@ def silhouette_method(data):
     plt.ylabel("Average silhouette")
     plt.xlabel("Number of clusters")
     plt.title("Average silhouette plot over clusters", size=15)
+    plt.show()
+
+
+def plot_dendrogram(data, linkage_='ward', distance='euclidean'):
+    """Plot corresponding dendrogram"""
+
+    linkage_matrix = linkage(data, linkage_)
+
+    sns.set()
+    fig = plt.figure(figsize=(11, 5))
+    # The Dendrogram parameters need to be tuned
+    y_threshold = 100
+    dendrogram(linkage_matrix, truncate_mode='level', p=5, color_threshold=y_threshold, above_threshold_color='k')
+    plt.hlines(y_threshold, 0, 1000, colors="r", linestyles="dashed")
+    plt.title(f'Hierarchical Clustering - {linkage_.title()}\'s Dendrogram', fontsize=21)
+    plt.xlabel('Number of points in node (or index of point if no parenthesis)')
+    plt.ylabel(f'{distance.title()} Distance', fontsize=13)
     plt.show()
 
 
