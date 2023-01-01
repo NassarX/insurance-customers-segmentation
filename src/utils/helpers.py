@@ -180,6 +180,8 @@ def silhouette_method(data):
     plt.title("Average silhouette plot over clusters", size=15)
     plt.show()
 
+    return optimal_k
+
 
 def plot_dendrogram(data, linkage_='ward', distance='euclidean'):
     """Plot corresponding dendrogram"""
@@ -196,6 +198,35 @@ def plot_dendrogram(data, linkage_='ward', distance='euclidean'):
     plt.xlabel('Number of points in node (or index of point if no parenthesis)')
     plt.ylabel(f'{distance.title()} Distance', fontsize=13)
     plt.show()
+
+
+def get_ss(df):
+    """Computes the sum of squares for all variables given a dataset
+
+    :param df dataset
+    :returns return sum of squares of each df variable
+    """
+
+    ss = np.sum(df.var() * (df.count() - 1))
+    return ss
+
+
+def r2_score(df, labels):
+    """Get the R2 metrics for each cluster solution
+
+    :param df datasets
+    :param labels cluster labels
+
+    :returns R2 metrics for each cluster
+    """
+
+    # get total sum of squares
+    sst = get_ss(df)
+
+    # compute ssw for each cluster labels
+    ssw = np.sum(df.groupby(labels).apply(get_ss))
+
+    return 1 - ssw / sst
 
 
 class Helper:
