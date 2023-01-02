@@ -197,6 +197,8 @@ def plot_dendrogram(data, linkage_='ward', distance='euclidean'):
     plt.title(f'Hierarchical Clustering - {linkage_.title()}\'s Dendrogram', fontsize=21)
     plt.xlabel('Number of points in node (or index of point if no parenthesis)')
     plt.ylabel(f'{distance.title()} Distance', fontsize=13)
+
+    plt.savefig(os.path.join('assets/figures', 'kmeans_centroids_parallel_plot.png'), dpi=200)
     plt.show()
 
 
@@ -236,9 +238,7 @@ def models_scores(df, models=None):
     r2_scores = {}
     silhouette_scores = {}
     kmeans_scores = {'r2_score': {}, 'silhouette_score': {}}
-    dbscan_scores = {'r2_score': {}, 'silhouette_score': {}}
     agglo_scores = {'r2_score': {}, 'silhouette_score': {}}
-    gmm_scores = {'r2_score': {}, 'silhouette_score': {}}
     range_val = range(2, 10)
     for n_clus in range_val:
         agglo_model_ = models['agglo'].set_params(n_clusters=n_clus)
@@ -251,25 +251,11 @@ def models_scores(df, models=None):
         kmeans_scores['r2_score'][n_clus] = r2_score(df, kmeans_labels_)
         kmeans_scores['silhouette_score'][n_clus] = silhouette_score(df, kmeans_labels_)
 
-        # dbscan_ = models['dbscan'].set_params(eps=0.9 - (n_clus / 20))
-        # dbscan_labels_ = dbscan_.fit_predict(df)
-        # dbscan_scores['r2_score'][n_clus] = r2_score(df, dbscan_labels_)
-        # dbscan_scores['silhouette_score'][n_clus] = silhouette_score(df, dbscan_labels_)
-
-        gmm_ = models['gmm'].set_params(n_components=n_clus)
-        gmm_labels_ = gmm_.fit_predict(df)
-        gmm_scores['r2_score'][n_clus] = r2_score(df, gmm_labels_)
-        gmm_scores['silhouette_score'][n_clus] = silhouette_score(df, gmm_labels_)
-
     r2_scores['K-means'] = kmeans_scores['r2_score']
-    #r2_scores['DBScan'] = dbscan_scores['r2_score']
     r2_scores['Agglomerative'] = agglo_scores['r2_score']
-    r2_scores['GMM'] = gmm_scores['r2_score']
 
     silhouette_scores['K-means'] = kmeans_scores['silhouette_score']
-    #silhouette_scores['DBScan'] = dbscan_scores['silhouette_score']
     silhouette_scores['Agglomerative'] = agglo_scores['silhouette_score']
-    silhouette_scores['GMM'] = gmm_scores['silhouette_score']
 
     return pd.DataFrame(r2_scores), pd.DataFrame(silhouette_scores)
 
