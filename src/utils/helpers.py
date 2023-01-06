@@ -3,14 +3,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import zscore
 import seaborn as sns
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, AgglomerativeClustering
 import os
 import warnings
-from sklearn.metrics import silhouette_score
-from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import silhouette_score, classification_report
+from sklearn.model_selection import GridSearchCV, cross_validate
 from scipy.cluster.hierarchy import dendrogram, linkage
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import confusion_matrix
 
 warnings.filterwarnings("ignore")
+
+FIGURES_PATH = "assets/figures"
 
 
 def load_data(file_path):
@@ -97,7 +101,7 @@ def get_education_rank(degree):
         return degree
 
 
-def heatmap_corr(cor, figures_path, title):
+def heatmap_corr(cor, title):
     p_corr = round(cor.iloc[1:, :-1].copy(), 2)
 
     # Setting up a diverging palette
@@ -119,12 +123,11 @@ def heatmap_corr(cor, figures_path, title):
     fig.subplots_adjust(top=0.95)
 
     plt.title(title)
-    plt.savefig(os.path.join(figures_path, title.replace(" ", "_") + '_heatmap.png'),
-                dpi=200)
+    plt.savefig(os.path.join(FIGURES_PATH, title.replace(" ", "_") + '_heatmap.png'), dpi=200)
     plt.show()
 
 
-def elbow_method(data):
+def plot_elbow_method(data, title):
     # find 'k' value by Elbow Method
     inertia = []
     range_val = range(1, 10)
@@ -136,7 +139,9 @@ def elbow_method(data):
     plt.plot(range_val, inertia, 'bx-')
     plt.xlabel('Values of K')
     plt.ylabel('Inertia')
-    plt.title('The Elbow Method using Inertia')
+    plt.title(title)
+
+    plt.savefig(os.path.join(FIGURES_PATH, title.replace(" ", "_") + '_plot.png'), dpi=200)
     plt.show()
 
 
@@ -183,22 +188,51 @@ def silhouette_method(data):
     return optimal_k
 
 
-def plot_dendrogram(data, linkage_='ward', distance='euclidean'):
+def plot_scatter_plot(data, n_clus, title):
+    # visualize the clustered dataframe with Scatter Plot
+    palette = ['red', 'green', 'blue', 'black', 'pink', 'gray', 'dodgerblue', 'purple', 'coolwarm']
+    sns.scatterplot(x="PC0", y="PC1", hue="cluster", data=data, palette=palette[0:n_clus])
+    plt.title(title)
+
+    plt.savefig(os.path.join(FIGURES_PATH, title.replace(" ", "_") + '_scatter_plot.png'), dpi=200)
+    plt.show()
+
+
+def plot_dendrogram(data, y_threshold, **params):
     """Plot corresponding dendrogram"""
 
-    linkage_matrix = linkage(data, linkage_)
+    # setting distance_threshold=0 ensures we compute the full tree.
+    model = AgglomerativeClustering(**params)
+    model = model.fit(data)
 
+    # create the counts of samples under each node
+    counts = np.zeros(model.children_.shape[0])
+    n_samples = len(model.labels_)
+    for i, merge in enumerate(model.children_):
+        current_count = 0
+        for child_idx in merge:
+            if child_idx < n_samples:
+                current_count += 1  # leaf node
+            else:
+                current_count += counts[child_idx - n_samples]
+        counts[i] = current_count
+    linkage_matrix = np.column_stack([model.children_, model.distances_, counts]).astype(float)
+
+    # Plot the corresponding dendrogram
     sns.set()
     fig = plt.figure(figsize=(11, 5))
-    # The Dendrogram parameters need to be tuned
-    y_threshold = 100
+    y_threshold = y_threshold
     dendrogram(linkage_matrix, truncate_mode='level', p=5, color_threshold=y_threshold, above_threshold_color='k')
+
+    linkage_ = params['linkage']
+    distance = params['affinity']
+    title = f'Hierarchical Clustering - {linkage_.title()}\'s Dendrogram'
     plt.hlines(y_threshold, 0, 1000, colors="r", linestyles="dashed")
-    plt.title(f'Hierarchical Clustering - {linkage_.title()}\'s Dendrogram', fontsize=21)
+    plt.title(title, fontsize=21)
     plt.xlabel('Number of points in node (or index of point if no parenthesis)')
     plt.ylabel(f'{distance.title()} Distance', fontsize=13)
-
-    plt.savefig(os.path.join('assets/figures', 'kmeans_centroids_parallel_plot.png'), dpi=200)
+    plt.hlines(y_threshold, 0, 1000, colors="r", linestyles="dashed")
+    plt.savefig(os.path.join(FIGURES_PATH, title.replace(" ", "_") + '_dendrogram_plot.png'), dpi=200)
     plt.show()
 
 
@@ -206,7 +240,7 @@ def get_ss(df):
     """Computes the sum of squares for all variables given a dataset
 
     :param df dataset
-    :returns return sum of squares of each df variable
+    :returns sum of squares of each df variable
     """
 
     ss = np.sum(df.var() * (df.count() - 1))
@@ -258,6 +292,82 @@ def models_scores(df, models=None):
     silhouette_scores['Agglomerative'] = agglo_scores['silhouette_score']
 
     return pd.DataFrame(r2_scores), pd.DataFrame(silhouette_scores)
+
+
+def grid_search(classifier, param_distributions, x, y, n_iter=50):
+    gsa = RandomizedSearchCV(classifier, param_distributions=param_distributions,
+                             n_iter=n_iter, n_jobs=10,
+                             scoring='accuracy')
+
+    gsf1 = RandomizedSearchCV(classifier, param_distributions=param_distributions,
+                              n_iter=n_iter, n_jobs=10,
+                              scoring='f1_weighted')
+
+    gsa.fit(x, y)
+    gsf1.fit(x, y)
+
+    # build the final dataframe, starting from the first search's results
+    dfres = pd.DataFrame(gsa.cv_results_)
+    dfres.rename(columns={'mean_test_score': 'accuracy'}, inplace=True)
+
+    # add to the dataframe also the second score (f1_score)
+    dfres['f1_score'] = gsf1.cv_results_['mean_test_score']
+
+    # sort the dataframe by the "accuracy" score
+    # (because we'll show the best results)
+    dfres.sort_values(by='accuracy', ascending=False, inplace=True)
+
+    # select only the interesting attributes
+    dfres = dfres[['params', 'accuracy', 'f1_score']]
+
+    # print('Best setting parameters ', gsa.best_params_)
+    print(dfres[:5])
+    return gsa.best_params_
+
+
+def feature_importance(dataframe, classifier):
+    importances = classifier.feature_importances_
+    features = dataframe.columns
+
+    for feat, importance in zip(features, importances):
+        print('{}, importance: {:.2f}'.format(feat, importance))
+
+    plt.figure()
+    plt.title("Feature importances")
+    plt.bar(x=features, height=importances, align="center")
+    plt.show()
+
+
+def generate_confusion_matrix(cf_matrix, title=''):
+    """
+    This function prints and plots the confusion matrix.
+    """
+    classes = ['Cluster 0', 'Cluster 1', 'Cluster 2', 'Cluster 3']
+    group_counts = ["{0:0.0f}".format(value) for value in cf_matrix.flatten()]
+    group_percentages = ["{0:.2%}".format(value) for value in cf_matrix.flatten() / np.sum(cf_matrix)]
+
+    labels = [f"{v1}\n{v2}" for v1, v2 in zip(group_counts, group_percentages)]
+    labels = np.asarray(labels).reshape(4, 4)
+    sns.heatmap(cf_matrix, annot=labels, fmt='', cmap=plt.cm.Blues)
+    tick_marks = np.arange(len(classes)) + 0.5
+    plt.xticks(tick_marks, classes, rotation=0)
+    plt.yticks(tick_marks, classes, rotation=0)
+    plt.title(title + " CF_Matrix")
+    plt.savefig(os.path.join(FIGURES_PATH, title.replace(" ", "_") + 'cf_heatmap.png'), dpi=200)
+    plt.show()
+
+
+def generate_classification_report(y_val, val_pred):
+    """
+    This function prints classification metrics report.
+    """
+    print(
+        '_______________________Begin Classification Report______________________')
+    print("Confusion Matrix: ")
+    print(confusion_matrix(y_val, val_pred))
+    print("Metrics Report: \n" + classification_report(y_val, val_pred))
+    print(
+        '_______________________________END Report___________________________')
 
 
 class Helper:
