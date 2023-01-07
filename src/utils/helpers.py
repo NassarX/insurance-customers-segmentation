@@ -49,8 +49,8 @@ def detect_outliers(data, metrics, method='iqr'):
         q25 = data.quantile(.25)
         q75 = data.quantile(.75)
         iqr = (q75 - q25)
-        upper_lim = q75 + 1.5 * iqr
-        lower_lim = q25 - 1.5 * iqr
+        upper_lim = q75 + 3 * iqr
+        lower_lim = q25 - 3 * iqr
 
         for metric in metrics:
             llim = lower_lim[metric]
@@ -156,7 +156,7 @@ def hyperparameter_tuning(model_, grid_params, data, scoring='f1', cv=5):
     return grid, best_params_
 
 
-def silhouette_method(data):
+def silhouette_method(data, title):
     # Storing average silhouette metric
     avg_silhouette = []
 
@@ -183,6 +183,8 @@ def silhouette_method(data):
     plt.ylabel("Average silhouette")
     plt.xlabel("Number of clusters")
     plt.title("Average silhouette plot over clusters", size=15)
+
+    plt.savefig(os.path.join(FIGURES_PATH, title.replace(" ", "_") + '_plot.png'), dpi=200)
     plt.show()
 
     return optimal_k
@@ -198,7 +200,7 @@ def plot_scatter_plot(data, n_clus, title):
     plt.show()
 
 
-def plot_dendrogram(data, y_threshold, **params):
+def plot_dendrogram(data, y_threshold, title, **params):
     """Plot corresponding dendrogram"""
 
     # setting distance_threshold=0 ensures we compute the full tree.
@@ -226,13 +228,13 @@ def plot_dendrogram(data, y_threshold, **params):
 
     linkage_ = params['linkage']
     distance = params['affinity']
-    title = f'Hierarchical Clustering - {linkage_.title()}\'s Dendrogram'
+    title_ = f'Hierarchical Clustering - {linkage_.title()}\'s Dendrogram'
     plt.hlines(y_threshold, 0, 1000, colors="r", linestyles="dashed")
-    plt.title(title, fontsize=21)
+    plt.title(title_, fontsize=21)
     plt.xlabel('Number of points in node (or index of point if no parenthesis)')
     plt.ylabel(f'{distance.title()} Distance', fontsize=13)
     plt.hlines(y_threshold, 0, 1000, colors="r", linestyles="dashed")
-    plt.savefig(os.path.join(FIGURES_PATH, title.replace(" ", "_") + '_dendrogram_plot.png'), dpi=200)
+    plt.savefig(os.path.join(FIGURES_PATH, title_.replace(" ", "_") + title + '_dendrogram_plot.png'), dpi=200)
     plt.show()
 
 
